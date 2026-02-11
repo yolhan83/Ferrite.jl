@@ -193,7 +193,7 @@ using ConcreteStructs
 # ### Physics: bathymetry, flux, source, numerical flux
 const g = 9.81
 
-bat(X)  = 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
++bat(X) = 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 batpx(X) = -2 * (X[1] - 5) * 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 batpy(X) = -2 * (X[2] - 5) * 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 
@@ -202,8 +202,7 @@ function F(U)
     ux = qx / h
     uy = qy / h
     p  = g * h * h / 2
-    return Vec{3}((qx, qx * ux + p, qx * uy)),
-           Vec{3}((qy, qy * ux,     qy * uy + p))
+    return Vec{3}((qx, qx * ux + p, qx * uy)), Vec{3}((qy, qy * ux, qy * uy + p))
 end
 
 function S(U, X)
@@ -213,7 +212,7 @@ end
 
 function max_speed(U, n)
     h, qx, qy = U
-    h = max(h, 1e-12)
+    h = max(h, 1.0e-12)
     return abs(qx * n[1] + qy * n[2]) / h + sqrt(g * h)
 end
 
@@ -236,18 +235,18 @@ relu(x) = x > 0 ? x : 0.0
 
 function outflow_riemann(Uin, n; h0 = 2.0, u0 = 0.0)
     h, qx, qy = Uin
-    h = max(h, 1e-12)
+    h = max(h, 1.0e-12)
     un = (qx * n[1] + qy * n[2]) / h
-    c  = sqrt(g * h)
+    c = sqrt(g * h)
 
     un >= c && return Uin
 
-    wplus  = un + 2c
+    wplus = un + 2c
     wminus = u0 - 2 * sqrt(g * h0)
 
     unB = (wplus + wminus) / 2
-    cB  = (wplus - wminus) / 4
-    hB  = max((cB * cB) / g, 1e-12)
+    cB = (wplus - wminus) / 4
+    hB = max((cB * cB) / g, 1.0e-12)
     qnB = hB * unB
 
     t1, t2 = -n[2], n[1]
@@ -296,14 +295,14 @@ order = 1
 ip = DiscontinuousLagrange{RefQuadrilateral, order}()
 
 dh = DofHandler(grid)
-add!(dh, :h,  ip)
+add!(dh, :h, ip)
 add!(dh, :hu, ip)
 add!(dh, :hv, ip)
 close!(dh)
 
 nd = ndofs(dh)
 
-qr       = QuadratureRule{RefQuadrilateral}(2 * order + 1)
+qr = QuadratureRule{RefQuadrilateral}(2 * order + 1)
 facet_qr = FacetQuadratureRule{RefQuadrilateral}(2 * order + 1)
 
 cv = CellValues(qr, ip)
@@ -313,9 +312,9 @@ iv = InterfaceValues(facet_qr, ip)
 #-
 # ### Mass matrix (block-diagonal per element)
 function assemble_mass_matrix!(M, dh, cv)
-    nb   = getnbasefunctions(cv)
+    nb = getnbasefunctions(cv)
     ndpc = 3 * nb
-    Me   = zeros(ndpc, ndpc)
+    Me = zeros(ndpc, ndpc)
 
     asM = start_assemble(M)
 
@@ -330,7 +329,7 @@ function assemble_mass_matrix!(M, dh, cv)
                 Φᵢ = shape_value(cv, qp, i)
                 for j in 1:nb
                     Φⱼ = shape_value(cv, qp, j)
-                    m  = (Φᵢ * Φⱼ) * dE
+                    m = (Φᵢ * Φⱼ) * dE
                     Me[i, j] += m
                     Me[i + nb, j + nb] += m
                     Me[i + 2nb, j + 2nb] += m
@@ -346,7 +345,7 @@ end
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
 
-Ut      = zeros(size(M, 1))
+Ut = zeros(size(M, 1))
 linprob = LinearProblem(M, Ut)
 
 #-
@@ -358,8 +357,8 @@ function volume_integral!(R, U, param, t)
 
     for cell in CellIterator(param.dh)
         Ferrite.reinit!(cv, cell)
-        dofs  = celldofs(cell)
-        Ue    = @view U[dofs]
+        dofs = celldofs(cell)
+        Ue = @view U[dofs]
         fill!(Re, 0.0)
 
         coords = getcoordinates(cell)
@@ -367,17 +366,17 @@ function volume_integral!(R, U, param, t)
         for qp in 1:getnquadpoints(cv)
             dE = getdetJdV(cv, qp)
 
-            h  = function_value(cv, qp, Ue, 1:nb)
-            qx = function_value(cv, qp, Ue, nb + 1:2nb)
-            qy = function_value(cv, qp, Ue, 2nb + 1:3nb)
+            h = function_value(cv, qp, Ue, 1:nb)
+            qx = function_value(cv, qp, Ue, (nb + 1):2nb)
+            qy = function_value(cv, qp, Ue, (2nb + 1):3nb)
             UU = Vec{3}((h, qx, qy))
 
             Fx, Fy = F(UU)
-            X      = spatial_coordinate(cv, qp, coords)
-            SS     = S(UU, X)
+            X = spatial_coordinate(cv, qp, coords)
+            SS = S(UU, X)
 
             @inbounds for i in 1:nb
-                Φᵢ  = shape_value(cv, qp, i)
+                Φᵢ = shape_value(cv, qp, i)
                 ∇Φᵢ = shape_gradient(cv, qp, i)
 
                 contrib = (Fx * ∇Φᵢ[1] + Fy * ∇Φᵢ[2] + SS * Φᵢ) * dE
@@ -402,20 +401,20 @@ function interface_integral!(R, U, param, t)
     for ic in param.ii
         Ferrite.reinit!(iv, ic)
         idofs = interfacedofs(ic)
-        Ui    = @view U[idofs]
+        Ui = @view U[idofs]
         fill!(Ri, 0.0)
 
         for qp in 1:getnquadpoints(iv)
-            n  = getnormal(iv, qp; here = true)
+            n = getnormal(iv, qp; here = true)
             dF = getdetJdV(iv, qp)
 
-            hL  = function_value(iv, qp, Ui, 1:nb,1 + ndpc:nb + ndpc;here = true)
-            qxL = function_value(iv, qp, Ui, 1 + nb:2nb,1 + nb + ndpc:2nb + ndpc;here = true)
-            qyL = function_value(iv, qp, Ui, 2nb + 1:3nb,2nb + 1 + ndpc:3nb + ndpc;here = true)
+            hL = function_value(iv, qp, Ui, 1:nb, (1 + ndpc):(nb + ndpc); here = true)
+            qxL = function_value(iv, qp, Ui, (1 + nb):2nb, (1 + nb + ndpc):(2nb + ndpc); here = true)
+            qyL = function_value(iv, qp, Ui, (2nb + 1):3nb, (2nb + 1 + ndpc):(3nb + ndpc); here = true)
 
-            hR  = function_value(iv, qp, Ui, 1:nb,1 + ndpc:nb + ndpc;here = false)
-            qxR = function_value(iv, qp, Ui, 1 + nb:2nb,1 + nb + ndpc:2nb + ndpc;here = false)
-            qyR = function_value(iv, qp, Ui, 2nb + 1:3nb,2nb + 1 + ndpc:3nb + ndpc;here = false)
+            hR = function_value(iv, qp, Ui, 1:nb, (1 + ndpc):(nb + ndpc); here = false)
+            qxR = function_value(iv, qp, Ui, (1 + nb):2nb, (1 + nb + ndpc):(2nb + ndpc); here = false)
+            qyR = function_value(iv, qp, Ui, (2nb + 1):3nb, (2nb + 1 + ndpc):(3nb + ndpc); here = false)
 
             UL = Vec{3}((hL, qxL, qyL))
             UR = Vec{3}((hR, qxR, qyR))
@@ -423,16 +422,16 @@ function interface_integral!(R, U, param, t)
             fhat = LF(UL, UR, n)
 
             @inbounds for i in 1:nb
-                ΦᵢL = shape_value(iv, qp, i;       here = true)
-                ΦᵢR = shape_value(iv, qp, i + nb;  here = false)
+                ΦᵢL = shape_value(iv, qp, i; here = true)
+                ΦᵢR = shape_value(iv, qp, i + nb; here = false)
 
-                Ri[i]          += (-ΦᵢL * fhat[1]) * dF
-                Ri[i + nb]     += (-ΦᵢL * fhat[2]) * dF
-                Ri[i + 2nb]    += (-ΦᵢL * fhat[3]) * dF
+                Ri[i] += (-ΦᵢL * fhat[1]) * dF
+                Ri[i + nb] += (-ΦᵢL * fhat[2]) * dF
+                Ri[i + 2nb] += (-ΦᵢL * fhat[3]) * dF
 
-                Ri[i + ndpc]        += (ΦᵢR * fhat[1]) * dF
-                Ri[i + nb + ndpc]   += (ΦᵢR * fhat[2]) * dF
-                Ri[i + 2nb + ndpc]  += (ΦᵢR * fhat[3]) * dF
+                Ri[i + ndpc] += (ΦᵢR * fhat[1]) * dF
+                Ri[i + nb + ndpc] += (ΦᵢR * fhat[2]) * dF
+                Ri[i + 2nb + ndpc] += (ΦᵢR * fhat[3]) * dF
             end
         end
 
@@ -462,21 +461,21 @@ function boundary_facets!(R, U, param, t)
                 n  = getnormal(fv, qp)
                 dF = getdetJdV(fv, qp)
 
-                h  = function_value(fv, qp, u_e, 1:nb)
-                qx = function_value(fv, qp, u_e, 1 + nb:2nb)
-                qy = function_value(fv, qp, u_e, 1 + 2nb:3nb)
+                h = function_value(fv, qp, u_e, 1:nb)
+                qx = function_value(fv, qp, u_e, (1 + nb):2nb)
+                qy = function_value(fv, qp, u_e, (1 + 2nb):3nb)
 
                 Uin = Vec{3}((h, qx, qy))
-                X   = spatial_coordinate(fv, qp, coords)
+                X = spatial_coordinate(fv, qp, coords)
 
-                Ubc  = bound_condition(Uin, X, tag, t, n)
+                Ubc = bound_condition(Uin, X, tag, t, n)
                 fhat = LF(Uin, Ubc, n)
 
                 @inbounds for i in 1:nb
                     Φᵢ = shape_value(fv, qp, i)
-                    Rb[i]        -= (Φᵢ * fhat[1]) * dF
-                    Rb[i + nb]   -= (Φᵢ * fhat[2]) * dF
-                    Rb[i + 2nb]  -= (Φᵢ * fhat[3]) * dF
+                    Rb[i] -= (Φᵢ * fhat[1]) * dF
+                    Rb[i + nb] -= (Φᵢ * fhat[2]) * dF
+                    Rb[i + 2nb] -= (Φᵢ * fhat[3]) * dF
                 end
             end
 
@@ -497,7 +496,7 @@ function ode!(dU, U, param, t)
     lin = param.lin
     lin.b = dU
     copyto!(dU, solve!(lin).u)
-    nothing
+    return nothing
 end
 
 #-
@@ -516,7 +515,7 @@ end
 end
 
 function Param(dh, cv, fv, topo, iv, ∂Ω, prob)
-    nb   = Ferrite.getnbasefunctions(cv)
+    nb = Ferrite.getnbasefunctions(cv)
     ndpc = 3 * nb
     return Param(
         dh,
@@ -539,12 +538,12 @@ param = Param(dh, cv, fv, topo, iv, ∂Ω, linprob)
 tspan = (0.0, 3.0)
 
 U0 = zeros(nd)
-apply_analytical!(U0, dh, :h,  x -> initial_condition(x)[1])
-apply_analytical!(U0, dh, :hu, x -> initial_condition(x)[2])
-apply_analytical!(U0, dh, :hv, x -> initial_condition(x)[3])
+apply_analytical!(U0, dh, :h, x -> initial_condition(x)[1])
+apply_analytical!(U0, dh, :hu, x -> initial_condition(x[2]))
+apply_analytical!(U0, dh, :hv, x -> initial_condition(x[3]))
 
 prob = ODEProblem(ode!, U0, tspan, param)
-sol  = solve(prob, Tsit5(); saveat = (tspan[2] - tspan[1]) / 100)
+sol = solve(prob, Tsit5(); saveat = (tspan[2] - tspan[1]) / 100)
 
 #-
 # ### Export to VTK (frames for a GIF)
