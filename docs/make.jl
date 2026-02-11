@@ -67,6 +67,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/reactive_surface.md",
             "tutorials/linear_shell.md",
             "tutorials/dg_heat_equation.md",
+            "tutorials/dg_shallow_water.md",
         ],
         "Topic guides" => [
             "Topic guide overview" => "topics/index.md",

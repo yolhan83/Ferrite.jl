@@ -178,3 +178,11 @@ Galerkin Infrastructure For the finite element toolbox
 Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5).
 
 **Keywords**: scalar-valued solution, Dirichlet boundary conditions, Discontinuous Galerkin, Interior penalty
+
+---
+
+#### [Tutorial 14: Discontinuous Galerkin shallow water equation (DG + RK)](@ref tutorial-swe-dg)
+
+This tutorial guides you through solving the **two-dimensional shallow water equations** (a nonlinear **hyperbolic** conservation law) using a **Discontinuous Galerkin (DG)** spatial discretization and an **explicit Runge–Kutta** time integrator. The tutorial introduces the hyperbolic DG workflow in Ferrite: assembling **volume terms** with `CellIterator`, coupling elements through **numerical fluxes** on **interfaces** via `InterfaceIterator`/`InterfaceValues` (two-sided traces with `here=true/false`), and treating boundary conditions using `FacetIterator`/`FacetValues`. A robust **Rusanov (local Lax–Friedrichs)** flux is used, and the semi-discrete system is advanced in time with `OrdinaryDiffEq`. The output is written as a sequence of VTK frames, ready to be combined into a GIF animation.
+
+**Keywords**: vector-valued solution, hyperbolic conservation laws, Discontinuous Galerkin, numerical flux, Runge–Kutta time integration, shallow water equations
