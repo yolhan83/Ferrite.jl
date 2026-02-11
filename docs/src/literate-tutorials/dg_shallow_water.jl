@@ -556,10 +556,11 @@ for i in eachindex(sol.u)
     end
 end
 
-# **Further important ingredients (not covered here).** For realistic shallow-water simulations, one typically adds: (i) a **positivity / slope limiter** to prevent non-physical negative water depths and to control oscillations near sharp gradients; (ii) a dedicated treatment of **dry states (wetting–drying / desiccation)** to handle cells where `h → 0` robustly (e.g. thresholds, modified fluxes, and consistent momentum handling); (iii) an **automatic CFL timestep selection**, e.g. 
-# ```math
-# \Delta t = \mathrm{CFL}\;\min_{K}\frac{h_K}{(2p+1)\,\max_{\partial K} c(U,n)},\qquad c(U,n)=|u\cdot n|+\sqrt{g h},
-# ```
+# **Further important ingredients (not covered here).** For realistic shallow-water simulations, one typically adds: (i) a **positivity / slope limiter** to prevent non-physical negative water depths and to control oscillations near sharp gradients; (ii) a dedicated treatment of **dry states (wetting–drying / desiccation)** to handle cells where `h → 0` robustly (e.g. thresholds, modified fluxes, and consistent momentum handling); (iii) an **automatic CFL timestep selection**, e.g.
+ # ```math
+ # \Delta t = \mathrm{CFL}\;\min_{K}\frac{h_K}{(2p+1)\,\max_{\partial K} c(U,n)},\qquad c(U,n)=|u\cdot n|+\sqrt{g h},
+ # ```
+
 # where `h_K` is a characteristic element size and `p` the DG polynomial degree; and (iv) a **hydrostatic reconstruction** to preserve the lake-at-rest steady state and improve balance between fluxes and the bathymetry source term.
 
 #-
