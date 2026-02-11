@@ -193,7 +193,7 @@ using ConcreteStructs
 # ### Physics: bathymetry, flux, source, numerical flux
 const g = 9.81
 
-+bat(X) = 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
+bat(X) = 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 batpx(X) = -2 * (X[1] - 5) * 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 batpy(X) = -2 * (X[2] - 5) * 0.5 * exp(-(X[1] - 5)^2 - (X[2] - 5)^2)
 
