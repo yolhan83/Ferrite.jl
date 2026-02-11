@@ -186,7 +186,7 @@
 # ## Commented program
 #
 using Ferrite, SparseArrays
-using OrdinaryDiffEq, LinearSolve
+using OrdinaryDiffEqTsit5, LinearSolve
 using ConcreteStructs
 
 #-
