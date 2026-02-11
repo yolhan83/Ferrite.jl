@@ -531,7 +531,7 @@ function Param(dh, cv, fv, topo, iv, ∂Ω, prob)
     )
 end
 
-param = Param(dh, cv, fv, topo, iv, ∂Ω, linprob)
+param = Param(dh, cv, fv, topo, iv, ∂Ω, linprob);
 
 #-
 # ### Project initial condition and solve
