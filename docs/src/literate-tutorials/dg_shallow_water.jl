@@ -181,11 +181,10 @@ nothing                    #hide
 # ```
 #
 # where:
-# - $M$ is the (block) **mass matrix** with entries $M_{ij}^E = \int_E \Phi_i^E \Phi_j^E\,dE$,
-# - $\mathbf{R}_{\mathrm{vol}}$ contains the volume contributions $\int_E (S(U)\Phi_i^E + F(U):\nabla\Phi_i^E)\,dE$,
-# - $\mathbf{R}_{\mathrm{int}}$ contains interior interface flux contributions,
-# - $\mathbf{R}_{\partial}$ contains boundary flux contributions (using boundary states).
-#
+# - ``M`` is the (block) **mass matrix** with entries $M_{ij}^E = \int_E \Phi_i^E \Phi_j^E\,dE$,
+# - ``\mathbf{R}_{\mathrm{vol}}`` contains the volume contributions $\int_E (S(U)\Phi_i^E + F(U):\nabla\Phi_i^E)\,dE$,
+# - ``\mathbf{R}_{\mathrm{int}}`` contains interior interface flux contributions,
+# - ``\mathbf{R}_{\partial}`` contains boundary flux contributions (using boundary states).
 # This semi-discrete system is then advanced in time with an explicit Runge–Kutta method.
 
 #-
