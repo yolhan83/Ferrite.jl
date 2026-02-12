@@ -534,12 +534,14 @@ apply_analytical!(U0, dh, :qy, x -> initial_condition(x)[3])
 prob = ODEProblem(ode!, U0, tspan, param)
 sol = solve(prob, Tsit5(); saveat = (tspan[2] - tspan[1]) / 100)
 
-isdir("datas") || mkdir("datas")
-for i in eachindex(sol.u)
-   ui = sol.u[i]
-   VTKGridFile("./datas/swe_$(i)", dh) do vtk
-       write_solution(vtk, dh, ui)   
-   end
+if !IS_CI
+    isdir("datas") || mkdir("datas")
+    for i in eachindex(sol.u)
+        ui = sol.u[i]
+        VTKGridFile("./datas/swe_$(i)", dh) do vtk
+            write_solution(vtk, dh, ui)
+        end
+    end
 end
 
 # **Further important ingredients (not covered here).** For realistic shallow-water simulations, one typically adds: (i) a **positivity / slope limiter** to prevent non-physical negative water depths and to control oscillations near sharp gradients; (ii) a dedicated treatment of **dry states (wetting–drying / desiccation)** to handle cells where `h → 0` robustly (e.g. thresholds, modified fluxes, and consistent momentum handling); (iii) an **automatic CFL timestep selection**, e.g.
