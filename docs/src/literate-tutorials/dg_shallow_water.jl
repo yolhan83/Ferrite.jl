@@ -346,6 +346,7 @@ end
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
 
+# ### Volume integral on each element
 function element_volume_integral!(R, cell, U, dr, param)
     dr_h, dr_qx, dr_qy = dr
     Re = param.Re
@@ -379,6 +380,7 @@ function element_volume_integral!(R, cell, U, dr, param)
 end
 #-
 
+# ### Interface integral on each interface
 function interface_integral!(R, ic, U, dr, param)
     dr_h, dr_qx, dr_qy = dr
     Ri = param.Ri
@@ -416,6 +418,7 @@ function interface_integral!(R, ic, U, dr, param)
     return nothing
 end
 
+# ### Boundary integral on each boundaray facet
 function boundary_facet!(R, tag, fc, U, dr, param, t)
     dr_h, dr_qx, dr_qy = dr
     fv = param.fv
