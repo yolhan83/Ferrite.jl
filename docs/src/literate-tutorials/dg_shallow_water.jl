@@ -317,9 +317,9 @@ function assemble_mass_matrix!(M, dh, cv)
     Me = zeros(ndpc, ndpc)
 
     asM = start_assemble(M)
-    dr_h = dof_range(dh,:h)
-    dr_qx = dof_range(dh,:qx)
-    dr_qy = dof_range(dh,:qy)
+    dr_h = dof_range(dh, :h)
+    dr_qx = dof_range(dh, :qx)
+    dr_qy = dof_range(dh, :qy)
     for cell in CellIterator(dh)
         Ferrite.reinit!(cv, cell)
         dofs = celldofs(cell)
@@ -346,148 +346,104 @@ end
 
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
-
-#-
-# ### Assemble the residual: volume + interfaces + boundary facets
-function volume_integral!(R, U, param, t)
+function element_volume_integral!(R,cell,U,dr,param)
+    dr_h,dr_qx,dr_qy = dr
     Re = param.Re
+    fill!(Re, 0.0)
     cv = param.cv
     nb = getnbasefunctions(cv)
-    dr_h = dof_range(param.dh,:h)
-    dr_qx = dof_range(param.dh,:qx)
-    dr_qy = dof_range(param.dh,:qy)
-    for cell in CellIterator(param.dh)
-        Ferrite.reinit!(cv, cell)
-        dofs = celldofs(cell)
-        Ue = @view U[dofs]
-        fill!(Re, 0.0)
-
-        coords = getcoordinates(cell)
-
-        for qp in 1:getnquadpoints(cv)
-            dE = getdetJdV(cv, qp)
-
-            h = function_value(cv, qp, Ue, 1:nb)
-            qx = function_value(cv, qp, Ue, (nb + 1):2nb)
-            qy = function_value(cv, qp, Ue, (2nb + 1):3nb)
-            UU = Vec{3}((h, qx, qy))
-
-            Fx, Fy = F(UU)
-            X = spatial_coordinate(cv, qp, coords)
-            SS = S(UU, X)
-
-            for i in 1:nb
-                Φᵢ = shape_value(cv, qp, i)
-                ∇Φᵢ = shape_gradient(cv, qp, i)
-
-                contrib = (Fx * ∇Φᵢ[1] + Fy * ∇Φᵢ[2] + SS * Φᵢ) * dE
-
-                Re[dr_h[i]] += contrib[1]
-                Re[dr_qx[i]] += contrib[2]
-                Re[dr_qy[i]] += contrib[3]
-            end
+    Ferrite.reinit!(cv, cell)
+    dofs = celldofs(cell)
+    Ue = @view U[dofs]
+    coords = getcoordinates(cell)
+    for qp in 1:getnquadpoints(cv)
+        dE = getdetJdV(cv, qp)
+        h = function_value(cv, qp, Ue, 1:nb)
+        qx = function_value(cv, qp, Ue, (nb + 1):2nb)
+        qy = function_value(cv, qp, Ue, (2nb + 1):3nb)
+        Uval = Vec{3}((h, qx, qy))
+        Fx, Fy = F(Uval)
+        X = spatial_coordinate(cv, qp, coords)
+        SS = S(Uval, X)
+        for i in 1:nb
+            Φᵢ = shape_value(cv, qp, i)
+            ∇Φᵢ = shape_gradient(cv, qp, i)
+            contrib = (Fx * ∇Φᵢ[1] + Fy * ∇Φᵢ[2] + SS * Φᵢ) * dE
+            Re[dr_h[i]] += contrib[1]
+            Re[dr_qx[i]] += contrib[2]
+            Re[dr_qy[i]] += contrib[3]
         end
-
-        Ferrite.assemble!(R, dofs, Re)
     end
-    return R
+    Ferrite.assemble!(R, dofs, Re)
 end
+#-
 
-function interface_integral!(R, U, param, t)
+function interface_integral!(R,ic,U,dr,param)
+    dr_h,dr_qx,dr_qy = dr
     Ri = param.Ri
+    fill!(Ri,0.0)
     iv = param.iv
     nb = getnbasefunctions(param.cv)
     ndpc = 3 * nb
-    dr_h = dof_range(param.dh,:h)
-    dr_qx = dof_range(param.dh,:qx)
-    dr_qy = dof_range(param.dh,:qy)
-    for ic in param.ii
-        Ferrite.reinit!(iv, ic)
-        idofs = interfacedofs(ic)
-        Ui = @view U[idofs]
-        fill!(Ri, 0.0)
-
-        for qp in 1:getnquadpoints(iv)
-            n = getnormal(iv, qp; here = true)
-            dF = getdetJdV(iv, qp)
-
-            hL = function_value(iv, qp, Ui, dr_h, dr_h .+ ndpc; here = true)
-            qxL = function_value(iv, qp, Ui, dr_qx, dr_qx .+ ndpc; here = true)
-            qyL = function_value(iv, qp, Ui, dr_qy, dr_qy .+ ndpc; here = true)
-
-            hR = function_value(iv, qp, Ui, dr_h, dr_h .+ ndpc;here = false)
-            qxR = function_value(iv, qp, Ui,dr_qx, dr_qx .+ ndpc; here = false)
-            qyR = function_value(iv, qp, Ui, dr_qy, dr_qy .+ ndpc; here = false)
-
-            UL = Vec{3}((hL, qxL, qyL))
-            UR = Vec{3}((hR, qxR, qyR))
-
-            fhat = LF(UL, UR, n)
-
-            for i in 1:nb
-                ΦᵢL = shape_value(iv, qp, i; here = true)
-                ΦᵢR = shape_value(iv, qp, i + nb; here = false)
-
-                Ri[dr_h[i]] += (-ΦᵢL * fhat[1]) * dF
-                Ri[dr_qx[i]] += (-ΦᵢL * fhat[2]) * dF
-                Ri[dr_qy[i]] += (-ΦᵢL * fhat[3]) * dF
-
-                Ri[dr_h[i]  + ndpc] += (ΦᵢR * fhat[1]) * dF
-                Ri[dr_qx[i] + ndpc] += (ΦᵢR * fhat[2]) * dF
-                Ri[dr_qy[i] + ndpc] += (ΦᵢR * fhat[3]) * dF
-            end
+    Ferrite.reinit!(iv, ic)
+    idofs = interfacedofs(ic)
+    Ui = @view U[idofs]
+    fill!(Ri, 0.0)
+    for qp in 1:getnquadpoints(iv)
+        n = getnormal(iv, qp; here = true)
+        dF = getdetJdV(iv, qp)
+        hL = function_value(iv, qp, Ui, dr_h, dr_h .+ ndpc; here = true)
+        qxL = function_value(iv, qp, Ui, dr_qx, dr_qx .+ ndpc; here = true)
+        qyL = function_value(iv, qp, Ui, dr_qy, dr_qy .+ ndpc; here = true)
+        hR = function_value(iv, qp, Ui, dr_h, dr_h .+ ndpc; here = false)
+        qxR = function_value(iv, qp, Ui, dr_qx, dr_qx .+ ndpc; here = false)
+        qyR = function_value(iv, qp, Ui, dr_qy, dr_qy .+ ndpc; here = false)
+        UL = Vec{3}((hL, qxL, qyL))
+        UR = Vec{3}((hR, qxR, qyR))
+        fhat = LF(UL, UR, n)
+        for i in 1:nb
+            ΦᵢL = shape_value(iv, qp, i; here = true)
+            ΦᵢR = shape_value(iv, qp, i + nb; here = false)
+            Ri[dr_h[i]] += (-ΦᵢL * fhat[1]) * dF
+            Ri[dr_qx[i]] += (-ΦᵢL * fhat[2]) * dF
+            Ri[dr_qy[i]] += (-ΦᵢL * fhat[3]) * dF
+            Ri[dr_h[i] + ndpc] += (ΦᵢR * fhat[1]) * dF
+            Ri[dr_qx[i] + ndpc] += (ΦᵢR * fhat[2]) * dF
+            Ri[dr_qy[i] + ndpc] += (ΦᵢR * fhat[3]) * dF
         end
-
-        Ferrite.assemble!(R, idofs, Ri)
     end
-    return R
+    Ferrite.assemble!(R, idofs, Ri)
 end
 
-function boundary_facets!(R, U, param, t)
+function boundary_facet!(R,tag,fc,U,dr,param,t)
+    dr_h,dr_qx,dr_qy = dr
     fv = param.fv
     nb = getnbasefunctions(param.cv)
     Rb = param.Re
-
-    facetsets = param.dh.grid.facetsets
-    dr_h = dof_range(param.dh,:h)
-    dr_qx = dof_range(param.dh,:qx)
-    dr_qy = dof_range(param.dh,:qy)
-    for tag in ("left", "right", "top", "bottom")
-        set = facetsets[tag]
-        for fc in FacetIterator(param.dh, set)
-            Ferrite.reinit!(fv, fc)
-            dofs = celldofs(fc)
-            @views u_e = U[dofs]
-            coords = Ferrite.getcoordinates(fc)
-
-            fill!(Rb, 0.0)
-
-            for qp in 1:getnquadpoints(fv)
-                n = getnormal(fv, qp)
-                dF = getdetJdV(fv, qp)
-
-                h = function_value(fv, qp, u_e, 1:nb)
-                qx = function_value(fv, qp, u_e, (1 + nb):2nb)
-                qy = function_value(fv, qp, u_e, (1 + 2nb):3nb)
-
-                Uin = Vec{3}((h, qx, qy))
-                X = spatial_coordinate(fv, qp, coords)
-
-                Ubc = bound_condition(Uin, X, tag, t, n)
-                fhat = LF(Uin, Ubc, n)
-
-                @inbounds for i in 1:nb
-                    Φᵢ = shape_value(fv, qp, i)
-                    Rb[dr_h[i]] -= (Φᵢ * fhat[1]) * dF
-                    Rb[dr_qx[i]] -= (Φᵢ * fhat[2]) * dF
-                    Rb[dr_qy[i]] -= (Φᵢ * fhat[3]) * dF
-                end
-            end
-
-            Ferrite.assemble!(R, dofs, Rb)
+    fill!(Rb,0.0)
+    Ferrite.reinit!(fv, fc)
+    dofs = celldofs(fc)
+    @views u_e = U[dofs]
+    coords = Ferrite.getcoordinates(fc)
+    fill!(Rb, 0.0)
+    for qp in 1:getnquadpoints(fv)
+        n = getnormal(fv, qp)
+        dF = getdetJdV(fv, qp)
+        h = function_value(fv, qp, u_e, dr_h)
+        qx = function_value(fv, qp, u_e, dr_qx)
+        qy = function_value(fv, qp, u_e, dr_qy)
+        Uin = Vec{3}((h, qx, qy))
+        X = spatial_coordinate(fv, qp, coords)
+        Ubc = bound_condition(Uin, X, tag, t, n)
+        fhat = LF(Uin, Ubc, n)
+        @inbounds for i in 1:nb
+            Φᵢ = shape_value(fv, qp, i)
+            Rb[dr_h[i]] -= (Φᵢ * fhat[1]) * dF
+            Rb[dr_qx[i]] -= (Φᵢ * fhat[2]) * dF
+            Rb[dr_qy[i]] -= (Φᵢ * fhat[3]) * dF
         end
     end
-    return R
+    Ferrite.assemble!(R, dofs, Rb)
 end
 
 #-
@@ -495,10 +451,24 @@ end
 function ode!(dU, U, param, t)
     dU2 = param.dU2
     fill!(dU2, 0.0)
-    volume_integral!(dU2, U, param, t)
-    interface_integral!(dU2, U, param, t)
-    boundary_facets!(dU2, U, param, t)
-    mul!(dU,param.M,dU2)
+    dr_h = dof_range(param.dh, :h)
+    dr_qx = dof_range(param.dh, :qx)
+    dr_qy = dof_range(param.dh, :qy)
+    dr = (dr_h,dr_qx,dr_qy)
+    for cell in CellIterator(param.dh)
+        element_volume_integral!(dU2,cell,U,dr,param)
+    end
+    for ic in param.ii
+        interface_integral!(dU2,ic,U,dr,param)
+    end
+    facetsets = param.dh.grid.facetsets
+    for tag in ("left", "right", "top", "bottom")
+        set = facetsets[tag]
+        for fc in FacetIterator(param.dh, set)
+            boundary_facet!(dU2,tag,fc,U,dr,param,t)
+        end
+    end
+    mul!(dU, param.M, dU2)
     return nothing
 end
 
