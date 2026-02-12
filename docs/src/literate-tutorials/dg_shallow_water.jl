@@ -308,8 +308,8 @@ close!(dh)
 
 nd = ndofs(dh)
 
-qr = QuadratureRule{RefQuadrilateral}(:lobatto,order+1)
-facet_qr = FacetQuadratureRule{RefQuadrilateral}(:lobatto,order+1)
+qr = QuadratureRule{RefQuadrilateral}(:lobatto, order+1)
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(:lobatto, order+1)
 
 cv = CellValues(qr, ip)
 fv = FacetValues(facet_qr, ip)
@@ -351,7 +351,7 @@ function assemble_mass_matrix!(M, dh, cv)
 end
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
-droptol!(M,1e-12)
+droptol!(M, 1.0e-12)
 M = Diagonal(M)
 # ### Volume integral on each element
 function element_volume_integral!(R, cell, U, dr, param)
@@ -535,12 +535,12 @@ apply_analytical!(U0, dh, :qy, x -> initial_condition(x)[3])
 problem = ODEProblem(ode!, U0, tspan, param)
 timestepper = Tsit5();
 integrator = init(
-    problem, timestepper; adaptive = true, abstol = 1.0e-8, reltol = 1.0e-9, progress = true, save_everystep=false, verbose = true
+    problem, timestepper; adaptive = true, abstol = 1.0e-8, reltol = 1.0e-9, progress = true, save_everystep = false, verbose = true
 );
 
 isdir("datas") || mkdir("datas")
 pvd = paraview_collection("./datas/shallow_water")
-ts = range(tspan[1], tspan[2], length=100)
+ts = range(tspan[1], tspan[2], length = 100)
 for (step, (u, t)) in enumerate(TimeChoiceIterator(integrator, ts))
     VTKGridFile("./datas/shallow_water-$step", dh) do vtk
         write_solution(vtk, dh, u)
