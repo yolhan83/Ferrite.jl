@@ -4,7 +4,7 @@ else                       #hide
     IS_CI = false          #hide
 end                        #hide
 nothing                    #hide
-# # [Shallow Water (hyperbolic) with DG + RK time stepping](@id tutorial-swe-dg)
+# # [Shallow Water (hyperbolic) with RKDG](@id tutorial-swe-dg)
 #
 # ![](sw_dg_ferrite.gif)
 #-
@@ -171,13 +171,13 @@ nothing                    #hide
 # Testing successively with each basis function leads to a system of ODEs for the DOFs:
 #
 # ```math
-# M \,\frac{d\mathbf{U}}{dt}
+# \frac{d\mathbf{U}}{dt}
 # =
-# \mathbf{R}_{\mathrm{vol}}(\mathbf{U})
+# M^{-1} [ \mathbf{R}_{\mathrm{vol}}(\mathbf{U})
 # +
 # \mathbf{R}_{\mathrm{int}}(\mathbf{U})
 # +
-# \mathbf{R}_{\partial}(\mathbf{U}),
+# \mathbf{R}_{\partial}(\mathbf{U})],
 # ```
 #
 # where:
@@ -194,6 +194,7 @@ nothing                    #hide
 using Ferrite, SparseArrays
 using OrdinaryDiffEqTsit5, LinearAlgebra
 using ConcreteStructs
+import WriteVTK: paraview_collection, vtk_save
 
 #-
 # ### Physics: bathymetry, flux, source, numerical flux
@@ -308,8 +309,8 @@ close!(dh)
 
 nd = ndofs(dh)
 
-qr = QuadratureRule{RefQuadrilateral}(2 * order + 1)
-facet_qr = FacetQuadratureRule{RefQuadrilateral}(2 * order + 1)
+qr = QuadratureRule{RefQuadrilateral}(:lobatto,order+1)
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(:lobatto,order+1)
 
 cv = CellValues(qr, ip)
 fv = FacetValues(facet_qr, ip)
@@ -351,7 +352,8 @@ function assemble_mass_matrix!(M, dh, cv)
 end
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
-
+droptol!(M,1e-12)
+M = Diagonal(M)
 # ### Volume integral on each element
 function element_volume_integral!(R, cell, U, dr, param)
     dr_h, dr_qx, dr_qy = dr
@@ -531,25 +533,31 @@ apply_analytical!(U0, dh, :h, x -> initial_condition(x)[1])
 apply_analytical!(U0, dh, :qx, x -> initial_condition(x)[2])
 apply_analytical!(U0, dh, :qy, x -> initial_condition(x)[3])
 
-prob = ODEProblem(ode!, U0, tspan, param)
-sol = solve(prob, Tsit5(); saveat = (tspan[2] - tspan[1]) / 100)
+problem = ODEProblem(ode!, U0, tspan, param)
+timestepper = Tsit5();
+integrator = init(
+    problem, timestepper; adaptive = true, abstol = 1.0e-8, reltol = 1.0e-9, progress = true, save_everystep=false, verbose = true
+);
 
-if !IS_CI
-    isdir("datas") || mkdir("datas")
-    for i in eachindex(sol.u)
-        ui = sol.u[i]
-        VTKGridFile("./datas/swe_$(i)", dh) do vtk
-            write_solution(vtk, dh, ui)
-        end
+isdir("datas") || mkdir("datas")
+pvd = paraview_collection("./datas/shallow_water")
+ts = range(tspan[1], tspan[2], length=100)
+for (step, (u, t)) in enumerate(TimeChoiceIterator(integrator, ts))
+    VTKGridFile("./datas/shallow_water-$step", dh) do vtk
+        write_solution(vtk, dh, u)
+        pvd[t] = vtk
     end
 end
+vtk_save(pvd)
 
-# **Further important ingredients (not covered here).** For realistic shallow-water simulations, one typically adds: (i) a **positivity / slope limiter** to prevent non-physical negative water depths and to control oscillations near sharp gradients; (ii) a dedicated treatment of **dry states (wetting–drying / desiccation)** to handle cells where `h → 0` robustly (e.g. thresholds, modified fluxes, and consistent momentum handling); (iii) an **automatic CFL timestep selection**, e.g.
+# - **Positivity / slope limiter**: prevents non-physical negative water depths and reduces spurious oscillations near sharp gradients.
+# - **Dry-state treatment (wetting–drying / desiccation)**: robust handling of cells where `h → 0` (e.g., thresholds, modified fluxes, consistent momentum handling).
+# - **Automatic CFL timestep selection**:
 # ```math
-# \Delta t = \mathrm{CFL}\;\min_{K}\frac{h_K}{(2p+1)\,\max_{\partial K} c(U,n)},\qquad c(U,n)=|u\cdot n|+\sqrt{g h},
+# \Delta t=\mathrm{CFL}\;\min_{K}\frac{h_K}{(2p+1)\,\max_{\partial K}c(U,n)},\qquad c(U,n)=|u\cdot n|+\sqrt{g h},
 # ```
-
-# where `h_K` is a characteristic element size and `p` the DG polynomial degree; and (iv) a **hydrostatic reconstruction** to preserve the lake-at-rest steady state and improve balance between fluxes and the bathymetry source term.
+# where $h_K$ is a characteristic element size and $p$ the DG polynomial degree.
+# - **Hydrostatic reconstruction**: preserves the lake-at-rest steady state and improves balance between fluxes and the bathymetry source term.
 
 #-
 # ## [Plain program](@id tutorial-swe-dg-plain-program)
