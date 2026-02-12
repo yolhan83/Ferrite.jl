@@ -355,13 +355,13 @@ function element_volume_integral!(R, cell, U, dr, param)
     nb = getnbasefunctions(cv)
     Ferrite.reinit!(cv, cell)
     dofs = celldofs(cell)
-    Ue = @view U[dofs]
+    Ue = @view U[dofs] # Note: For performance reasons, we don’t recommend using this outside the DG framework; here, the DOFs are guaranteed to be stored contiguously in memory.
     coords = getcoordinates(cell)
     for qp in 1:getnquadpoints(cv)
         dE = getdetJdV(cv, qp)
-        h = function_value(cv, qp, Ue, 1:nb)
-        qx = function_value(cv, qp, Ue, (nb + 1):2nb)
-        qy = function_value(cv, qp, Ue, (2nb + 1):3nb)
+        h = function_value(cv, qp, Ue, dr_h)
+        qx = function_value(cv, qp, Ue, dr_qx)
+        qy = function_value(cv, qp, Ue, dr_qy)
         Uval = Vec{3}((h, qx, qy))
         Fx, Fy = F(Uval)
         X = spatial_coordinate(cv, qp, coords)
@@ -390,7 +390,8 @@ function interface_integral!(R, ic, U, dr, param)
     ndpc = 3 * nb
     Ferrite.reinit!(iv, ic)
     idofs = interfacedofs(ic)
-    Ui = @view U[idofs]
+    Ui = param.Ui
+    Ui .= @view U[idofs]
     for qp in 1:getnquadpoints(iv)
         n = getnormal(iv, qp; here = true)
         dF = getdetJdV(iv, qp)
@@ -491,6 +492,7 @@ end
     Ri
     ii
     dU2
+    Ui
 end
 
 function Param(dh, cv, fv, topo, iv, ∂Ω, M)
@@ -507,7 +509,8 @@ function Param(dh, cv, fv, topo, iv, ∂Ω, M)
         zeros(ndpc),
         zeros(2 * ndpc),
         InterfaceIterator(dh, topo),
-        zeros(ndofs(dh))
+        zeros(ndofs(dh)),
+        zeros(2 * ndpc)
     )
 end
 
