@@ -308,8 +308,8 @@ close!(dh)
 
 nd = ndofs(dh)
 
-qr = QuadratureRule{RefQuadrilateral}(:lobatto, order+1)
-facet_qr = FacetQuadratureRule{RefQuadrilateral}(:lobatto, order+1)
+qr = QuadratureRule{RefQuadrilateral}(:lobatto, order + 1)
+facet_qr = FacetQuadratureRule{RefQuadrilateral}(:lobatto, order + 1)
 
 cv = CellValues(qr, ip)
 fv = FacetValues(facet_qr, ip)
