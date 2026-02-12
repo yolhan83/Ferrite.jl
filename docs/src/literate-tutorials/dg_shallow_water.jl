@@ -343,10 +343,10 @@ function assemble_mass_matrix!(M, dh, cv)
     end
     return M
 end
-
 M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
-function element_volume_integral!(R,cell,U,dr,param)
+
+function element_volume_integral!(R, cell, U, dr, param)
     dr_h,dr_qx,dr_qy = dr
     Re = param.Re
     fill!(Re, 0.0)
@@ -375,10 +375,11 @@ function element_volume_integral!(R,cell,U,dr,param)
         end
     end
     Ferrite.assemble!(R, dofs, Re)
+    return nothing
 end
 #-
 
-function interface_integral!(R,ic,U,dr,param)
+function interface_integral!(R, ic, U, dr, param)
     dr_h,dr_qx,dr_qy = dr
     Ri = param.Ri
     fill!(Ri,0.0)
@@ -413,14 +414,15 @@ function interface_integral!(R,ic,U,dr,param)
         end
     end
     Ferrite.assemble!(R, idofs, Ri)
+    return nothing
 end
 
 function boundary_facet!(R,tag,fc,U,dr,param,t)
-    dr_h,dr_qx,dr_qy = dr
+    dr_h, dr_qx, dr_qy = dr
     fv = param.fv
     nb = getnbasefunctions(param.cv)
     Rb = param.Re
-    fill!(Rb,0.0)
+    fill!(Rb, 0.0)
     Ferrite.reinit!(fv, fc)
     dofs = celldofs(fc)
     @views u_e = U[dofs]
@@ -444,6 +446,7 @@ function boundary_facet!(R,tag,fc,U,dr,param,t)
         end
     end
     Ferrite.assemble!(R, dofs, Rb)
+    return nothing
 end
 
 #-
@@ -456,16 +459,16 @@ function ode!(dU, U, param, t)
     dr_qy = dof_range(param.dh, :qy)
     dr = (dr_h,dr_qx,dr_qy)
     for cell in CellIterator(param.dh)
-        element_volume_integral!(dU2,cell,U,dr,param)
+        element_volume_integral!(dU2,cell, U, dr, param)
     end
     for ic in param.ii
-        interface_integral!(dU2,ic,U,dr,param)
+        interface_integral!(dU2, ic, U, dr, param)
     end
     facetsets = param.dh.grid.facetsets
     for tag in ("left", "right", "top", "bottom")
         set = facetsets[tag]
         for fc in FacetIterator(param.dh, set)
-            boundary_facet!(dU2,tag,fc,U,dr,param,t)
+            boundary_facet!(dU2, tag, fc, U, dr, param, t)
         end
     end
     mul!(dU, param.M, dU2)
