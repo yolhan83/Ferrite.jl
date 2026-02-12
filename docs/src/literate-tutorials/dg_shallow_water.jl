@@ -347,7 +347,7 @@ M = allocate_matrix(dh)
 assemble_mass_matrix!(M, dh, cv)
 
 function element_volume_integral!(R, cell, U, dr, param)
-    dr_h,dr_qx,dr_qy = dr
+    dr_h, dr_qx, dr_qy = dr
     Re = param.Re
     fill!(Re, 0.0)
     cv = param.cv
@@ -382,14 +382,13 @@ end
 function interface_integral!(R, ic, U, dr, param)
     dr_h,dr_qx,dr_qy = dr
     Ri = param.Ri
-    fill!(Ri,0.0)
+    fill!(Ri, 0.0)
     iv = param.iv
     nb = getnbasefunctions(param.cv)
     ndpc = 3 * nb
     Ferrite.reinit!(iv, ic)
     idofs = interfacedofs(ic)
     Ui = @view U[idofs]
-    fill!(Ri, 0.0)
     for qp in 1:getnquadpoints(iv)
         n = getnormal(iv, qp; here = true)
         dF = getdetJdV(iv, qp)
@@ -417,7 +416,7 @@ function interface_integral!(R, ic, U, dr, param)
     return nothing
 end
 
-function boundary_facet!(R,tag,fc,U,dr,param,t)
+function boundary_facet!(R, tag, fc, U, dr, param, t)
     dr_h, dr_qx, dr_qy = dr
     fv = param.fv
     nb = getnbasefunctions(param.cv)
@@ -457,9 +456,9 @@ function ode!(dU, U, param, t)
     dr_h = dof_range(param.dh, :h)
     dr_qx = dof_range(param.dh, :qx)
     dr_qy = dof_range(param.dh, :qy)
-    dr = (dr_h,dr_qx,dr_qy)
+    dr = (dr_h, dr_qx, dr_qy)
     for cell in CellIterator(param.dh)
-        element_volume_integral!(dU2,cell, U, dr, param)
+        element_volume_integral!(dU2, cell, U, dr, param)
     end
     for ic in param.ii
         interface_integral!(dU2, ic, U, dr, param)
